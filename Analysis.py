@@ -9,8 +9,11 @@ import graphviz
 pd.options.display.html.table_schema = False
 pd.options.display.max_rows = 100
 
-data_AMD = pd.read_csv("C:/Users/jrpgo/OneDrive - Rigor Consultoria e Gestão, SA/Pessoal/Python/Stocks/Data/AMD.csv", parse_dates =["Date"])
-data_SPY = pd.read_csv("C:/Users/jrpgo/OneDrive - Rigor Consultoria e Gestão, SA/Pessoal/Python/Stocks/Data/SPY.csv", parse_dates =["Date"])
+data_AMD = pd.read_csv("C:/Users/joser/Google Drive/Projects/Python/Stocks/Data/AMD.csv", parse_dates =["Date"])
+data_SPY = pd.read_csv("C:/Users/joser/Google Drive/Projects/Python/Stocks/Data/SPY.csv", parse_dates =["Date"])
+
+#data_AMD = pd.read_csv("C:/Users/jrpgo/OneDrive - Rigor Consultoria e Gestão, SA/Pessoal/Python/Stocks/Data/AMD.csv", parse_dates =["Date"])
+#data_SPY = pd.read_csv("C:/Users/jrpgo/OneDrive - Rigor Consultoria e Gestão, SA/Pessoal/Python/Stocks/Data/SPY.csv", parse_dates =["Date"])
 
 df_AMD = pd.DataFrame(data_AMD)
 df_SPY = pd.DataFrame(data_SPY)
