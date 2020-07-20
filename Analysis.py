@@ -148,9 +148,11 @@ plt.close()
 ##Classification Tree
 # Convert Target to string
 data['Max(5)'] = data['Max(5)'].apply(str)
-data.dtypes
-
+# Create train and test data. 42 for reproducibility
 X = data.drop(['High(5)','Max(5)'],axis=1).values
 y = data['Max(5)'].values
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+
 clf = tree.DecisionTreeClassifier()
-clf = clf.fit(X, y)
+clf = clf.fit(X_train, y_train)
+clf.score(X_test, y_test)
