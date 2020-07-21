@@ -34,7 +34,11 @@ df_Total.rename(columns={'Open_x':'Open',
                           'Low_y':'Low_SPY',
                           'Adj Close_y':'Close_SPY',
                           'Volume_y':'Volume_SPY'},
-                          inplace=True)
+
+#                          inplace=True)
+days = 5
+max = 'Max(' + str(days) +  ')'
+high = 'High(' + str(days) +  ')'
 
 # Rolling AVG AMD
 df_Total["MA(5)"] = round(df_Total["Close"].rolling(5).mean(),2)
@@ -148,7 +152,7 @@ plt.close()
 
 ##Classification Tree
 # Convert Target to string
-data['Max(5)'] = data['Max(5)'].apply(str)
+data['High(5)'] = data['High(5)'].apply(str)
 # Create train and test data. 42 for reproducibility
 X = data.drop(['High(5)','Max(5)'],axis=1).values
 y = data['Max(5)'].values
