@@ -3,8 +3,9 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 from sklearn import tree
+from sklearn.model_selection import cross_val_score
 from sklearn.model_selection import train_test_split
-import graphviz  
+from sklearn.metrics import confusion_matrix
 
 pd.options.display.html.table_schema = False
 pd.options.display.max_rows = 100
