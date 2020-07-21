@@ -155,9 +155,17 @@ plt.close()
 data['High(5)'] = data['High(5)'].apply(str)
 # Create train and test data. 42 for reproducibility
 X = data.drop(['High(5)','Max(5)'],axis=1).values
-y = data['Max(5)'].values
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
-
+y = data['High(5)'].values
+data_features = ['Rel. Vol(10)', 'Rel. Vol(10)_SPY', 'RSI', 'RSI_SPY', '5>10', '10>50',
+       '50>100', '100>150', '150>200', '5>10_SPY', '10>50_SPY', '50>100_SPY',
+       '100>150_SPY', '150>200_SPY']
+# Create Model, Evaluate Cross
 clf = tree.DecisionTreeClassifier()
+clf = clf.fit(X, y)
+cv_results = cross_val_score(clf, X, y, cv=10)
+print(np.mean(cv_results))
+# Re-create model (split) & Confusion Matrix
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42,stratify=y)
 clf = clf.fit(X_train, y_train)
-clf.score(X_test, y_test)
+y_predict = clf.predict(X_test)
+confusion_matrix(y_test, y_predict)
