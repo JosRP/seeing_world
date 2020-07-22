@@ -7,21 +7,18 @@ from sklearn.model_selection import cross_val_score
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import classification_report
+from sklearn.naive_bayes import GaussianNB
+import yfinance as yf
+SPY = yf.download("SPY", start="2019-07-22", end="2020-07-22",actions=False)
+AMD = yf.download("AMD", start="2019-07-22", end="2020-07-22",actions=False)
 
-# Need update bases
 # Need find way to remove -2% if befoire max 5%
 
 pd.options.display.html.table_schema = False
 pd.options.display.max_rows = 100
 
-data_AMD = pd.read_csv("C:/Users/joser/Google Drive/Projects/Python/Stocks/Data/AMD.csv", parse_dates =["Date"])
-data_SPY = pd.read_csv("C:/Users/joser/Google Drive/Projects/Python/Stocks/Data/SPY.csv", parse_dates =["Date"])
-
-#data_AMD = pd.read_csv("C:/Users/jrpgo/OneDrive - Rigor Consultoria e Gestão, SA/Pessoal/Python/Stocks/Data/AMD.csv", parse_dates =["Date"])
-#data_SPY = pd.read_csv("C:/Users/jrpgo/OneDrive - Rigor Consultoria e Gestão, SA/Pessoal/Python/Stocks/Data/SPY.csv", parse_dates =["Date"])
-
-df_AMD = pd.DataFrame(data_AMD)
-df_SPY = pd.DataFrame(data_SPY)
+df_AMD = pd.DataFrame(AMD)
+df_SPY = pd.DataFrame(SPY)
 
 del df_AMD["Close"]
 del df_SPY["Close"]
@@ -73,9 +70,6 @@ df_Total["Target(x)"] = np.where(df_Total["Max(x)"]>=0.05, "1", "0")
 # Relative Volume last 10 days
 df_Total["Rel. Vol(10)"] = round(df_Total["Volume"]/(df_Total["Volume"].rolling(10).mean())-1,2)
 df_Total["Rel. Vol(10)_SPY"] =  round(df_Total["Volume_SPY"]/(df_Total["Volume_SPY"].rolling(10).mean())-1,2)
-
-# Date as Index
-df_Total.set_index('Date', inplace=True)
 
 ## RSI
 window_length = 14
@@ -173,6 +167,4 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_
 clf = clf.fit(X_train, y_train)
 y_predict = clf.predict(X_test)
 confusion_matrix(y_test, y_predict)
-
-
 print(classification_report(y_test, y_predict))
