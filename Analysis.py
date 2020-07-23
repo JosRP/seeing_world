@@ -8,7 +8,12 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import classification_report
 from sklearn.naive_bayes import GaussianNB
+from sklearn.metrics import roc_auc_score
+from sklearn.metrics import roc_curve, auc
+from sklearn.linear_model import LogisticRegression
+ from sklearn import preprocessing
 import yfinance as yf
+
 SPY = yf.download("SPY", start="2019-07-22", end="2020-07-22",actions=False)
 AMD = yf.download("AMD", start="2019-07-22", end="2020-07-22",actions=False)
 
@@ -65,7 +70,7 @@ df_Total["Max(x)"] = round((df_Total["High"].rolling(days).max().shift(-5)/df_To
 #df_Total["Min(x)"] = round((df_Total["High"].rolling(days).min().shift(-5)/df_Total["Close"])-1,2)
 
 # Did Grown more than 5% next 5 days?
-df_Total["Target(x)"] = np.where(df_Total["Max(x)"]>=0.05, "1", "0")
+df_Total["Target(x)"] = np.where(df_Total["Max(x)"]>=0.05, "Buy", "Not")
 
 # Relative Volume last 10 days
 df_Total["Rel. Vol(10)"] = round(df_Total["Volume"]/(df_Total["Volume"].rolling(10).mean())-1,2)
@@ -118,8 +123,7 @@ data=df_Total.loc[:,['Target(x)', 'Max(x)', 'Rel. Vol(10)',
 
 # Remove NAN convert objects to int
 data = data.dropna()
-data[['Target(x)',
-    '5>10',
+data[['5>10',
     '10>50',
     '50>100',
     '100>150',
@@ -128,8 +132,7 @@ data[['Target(x)',
     '10>50_SPY',
     '50>100_SPY',
     '100>150_SPY',
-    '150>200_SPY']] = data[['Target(x)',
-    '5>10',
+    '150>200_SPY']] = data[['5>10',
     '10>50',
     '50>100',
     '100>150',
@@ -148,23 +151,56 @@ plt.close()
 sns.boxplot(x='5>10',y='Max(x)',data=data)
 plt.close()
 
-##Classification Tree
-# Convert Target to string
-data['Target(x)'] = data['Target(x)'].apply(str)
-# Create train and test data. 42 for reproducibility
+## Models
+# Divide Features & target
 X = data.drop(['Target(x)','Max(x)'],axis=1).values
 y = data['Target(x)'].values
-data_features = ['Rel. Vol(10)', 'Rel. Vol(10)_SPY', 'RSI', 'RSI_SPY', '5>10', '10>50',
-       '50>100', '100>150', '150>200', '5>10_SPY', '10>50_SPY', '50>100_SPY',
-       '100>150_SPY', '150>200_SPY']
-# Create Model, Evaluate Cross
+
+# =
+
+# Create Tree, Evaluate Cross
 clf = tree.DecisionTreeClassifier()
 clf = clf.fit(X, y)
 cv_results = cross_val_score(clf, X, y, cv=10)
-print(np.mean(cv_results))
-# Re-create model (split) & Confusion Matrix
+np.mean(cv_results)
+
+# Create train and test data. 42 for reproducibility
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42,stratify=y)
+
+# Normalize data
+X_train, X_test = preprocessing.scale(X_train),  preprocessing.scale(X_test)
+
+# Create Tree and evaluate (Confusion and Specificity)
 clf = clf.fit(X_train, y_train)
 y_predict = clf.predict(X_test)
 confusion_matrix(y_test, y_predict)
-print(classification_report(y_test, y_predict))
+classification_report(y_test, y_predict)
+
+# Create Tree ROC Curve Variables
+y_pred_prob = clf.predict_proba(X_test)[:,1]
+fpr, tpr, thresholds = roc_curve(y_test, y_pred_prob,pos_label="Buy")
+
+# Create Logistic ROC Plot
+plt.plot([0, 1], [0, 1], 'k--')
+plt.plot(fpr, tpr, label='Logistic Regression')
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('Decision Tree ROC Curve')
+plt.show()
+
+
+# Create Logistic
+logreg = LogisticRegression()
+logreg.fit(X_train, y_train)
+
+# Create Logistic ROC Curve Variables
+y_pred_prob = logreg.predict_proba(X_test)[:,1]
+fpr, tpr, thresholds = roc_curve(y_test, y_pred_prob,pos_label="Buy")
+
+# Create Logistic ROC Plot
+plt.plot([0, 1], [0, 1], 'k--')
+plt.plot(fpr, tpr, label='Logistic Regression')
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('Decision Tree ROC Curve')
+plt.show()
