@@ -11,7 +11,7 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.metrics import roc_auc_score
 from sklearn.metrics import roc_curve, auc
 from sklearn.linear_model import LogisticRegression
- from sklearn import preprocessing
+from sklearn import preprocessing
 import yfinance as yf
 
 SPY = yf.download("SPY", start="2019-07-22", end="2020-07-22",actions=False)
@@ -156,13 +156,11 @@ plt.close()
 X = data.drop(['Target(x)','Max(x)'],axis=1).values
 y = data['Target(x)'].values
 
-# =
-
 # Create Tree, Evaluate Cross
 clf = tree.DecisionTreeClassifier()
 clf = clf.fit(X, y)
 cv_results = cross_val_score(clf, X, y, cv=10)
-np.mean(cv_results)
+print(np.mean(cv_results))
 
 # Create train and test data. 42 for reproducibility
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42,stratify=y)
@@ -170,17 +168,15 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_
 # Normalize data
 X_train, X_test = preprocessing.scale(X_train),  preprocessing.scale(X_test)
 
-# Create Tree and evaluate (Confusion and Specificity)
+# Create Tree
 clf = clf.fit(X_train, y_train)
 y_predict = clf.predict(X_test)
-confusion_matrix(y_test, y_predict)
-classification_report(y_test, y_predict)
 
 # Create Tree ROC Curve Variables
 y_pred_prob = clf.predict_proba(X_test)[:,1]
 fpr, tpr, thresholds = roc_curve(y_test, y_pred_prob,pos_label="Buy")
 
-# Create Logistic ROC Plot
+# Create Decision Tree ROC Plot
 plt.plot([0, 1], [0, 1], 'k--')
 plt.plot(fpr, tpr, label='Logistic Regression')
 plt.xlabel('False Positive Rate')
@@ -188,8 +184,13 @@ plt.ylabel('True Positive Rate')
 plt.title('Decision Tree ROC Curve')
 plt.show()
 
+# Create Logistic & Evaluate CV
+logreg = LogisticRegression()
+logreg = logreg.fit(X, y)
+cv_results = cross_val_score(logreg, X, y, cv=10)
+print(np.mean(cv_results))
 
-# Create Logistic
+# Cretae Logistic
 logreg = LogisticRegression()
 logreg.fit(X_train, y_train)
 
@@ -202,5 +203,5 @@ plt.plot([0, 1], [0, 1], 'k--')
 plt.plot(fpr, tpr, label='Logistic Regression')
 plt.xlabel('False Positive Rate')
 plt.ylabel('True Positive Rate')
-plt.title('Decision Tree ROC Curve')
+plt.title('Logistic Reg. ROC Curve')
 plt.show()
