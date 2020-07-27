@@ -11,11 +11,14 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.metrics import roc_auc_score
 from sklearn.metrics import roc_curve, auc
 from sklearn.linear_model import LogisticRegression
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
+from sklearn.model_selection import GridSearchCV
 from sklearn import preprocessing
 import yfinance as yf
 
-SPY = yf.download("SPY", start="2019-07-22", end="2020-07-22",actions=False)
-AMD = yf.download("AMD", start="2019-07-22", end="2020-07-22",actions=False)
+SPY = yf.download("SPY", start="2018-07-22", end="2020-07-22",actions=False)
+AMD = yf.download("AMD", start="2018-07-22", end="2020-07-22",actions=False)
 
 # Need find way to remove -2% if befoire max 5%
 
@@ -123,25 +126,8 @@ data=df_Total.loc[:,['Target(x)', 'Max(x)', 'Rel. Vol(10)',
 
 # Remove NAN convert objects to int
 data = data.dropna()
-data[['5>10',
-    '10>50',
-    '50>100',
-    '100>150',
-    '150>200',
-    '5>10_SPY',
-    '10>50_SPY',
-    '50>100_SPY',
-    '100>150_SPY',
-    '150>200_SPY']] = data[['5>10',
-    '10>50',
-    '50>100',
-    '100>150',
-    '150>200',
-    '5>10_SPY',
-    '10>50_SPY',
-    '50>100_SPY',
-    '100>150_SPY',
-    '150>200_SPY']].apply(pd.to_numeric)
+cols=['5>10', '10>50', '50>100', '100>150', '150>200', '5>10_SPY', '10>50_SPY', '50>100_SPY', '100>150_SPY', '150>200_SPY']
+data[cols] = data[cols].apply(pd.to_numeric)
 
 # EDA
 sns.scatterplot(x='Rel. Vol(10)',y='Max(x)',data=data)
@@ -151,57 +137,59 @@ plt.close()
 sns.boxplot(x='5>10',y='Max(x)',data=data)
 plt.close()
 
-## Models
 # Divide Features & target
 X = data.drop(['Target(x)','Max(x)'],axis=1).values
 y = data['Target(x)'].values
-
-# Create Tree, Evaluate Cross
-clf = tree.DecisionTreeClassifier()
-clf = clf.fit(X, y)
-cv_results = cross_val_score(clf, X, y, cv=10)
-print(np.mean(cv_results))
-
 # Create train and test data. 42 for reproducibility
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42,stratify=y)
 
-# Normalize data
-X_train, X_test = preprocessing.scale(X_train),  preprocessing.scale(X_test)
-
-# Create Tree
-clf = clf.fit(X_train, y_train)
-y_predict = clf.predict(X_test)
-
+########################## Decision Tree
+# Create Steps & Pipeline
+steps = [('scaler', StandardScaler()),
+('decisiontree', tree.DecisionTreeClassifier())]
+pipeline = Pipeline(steps)
+#Hyperperameters
+criterion = ['gini', 'entropy']
+max_depth = np.linspace(1, 32, 32, endpoint=True)
+parameters = {'decisiontree__criterion':criterion,'decisiontree__max_depth':max_depth,'decisiontree__random_state':[1]}
+#Fit and Evaluate
+GS_Tree = GridSearchCV(pipeline,parameters)
+GS_Tree.fit(X_train, y_train)
+GS_Tree.score(X_test,y_test)
+y_pred = GS_Tree.predict(X_test)
+classification_report(y_test, y_pred)
 # Create Tree ROC Curve Variables
-y_pred_prob = clf.predict_proba(X_test)[:,1]
-fpr, tpr, thresholds = roc_curve(y_test, y_pred_prob,pos_label="Buy")
-
+y_pred_prob = GS_Tree.predict_proba(X_test)[:,0]
+GS_Tree.predict_proba(X_test)
+fpr, tpr, thresholds = roc_curve(y_test, y_pred_prob, pos_label="Buy")
 # Create Decision Tree ROC Plot
 plt.plot([0, 1], [0, 1], 'k--')
-plt.plot(fpr, tpr, label='Logistic Regression')
+plt.plot(fpr, tpr, label='Decision Tree')
 plt.xlabel('False Positive Rate')
 plt.ylabel('True Positive Rate')
 plt.title('Decision Tree ROC Curve')
-plt.show()
 
-# Create Logistic & Evaluate CV
-logreg = LogisticRegression()
-logreg = logreg.fit(X, y)
-cv_results = cross_val_score(logreg, X, y, cv=10)
-print(np.mean(cv_results))
 
-# Cretae Logistic
-logreg = LogisticRegression()
-logreg.fit(X_train, y_train)
-
-# Create Logistic ROC Curve Variables
-y_pred_prob = logreg.predict_proba(X_test)[:,1]
-fpr, tpr, thresholds = roc_curve(y_test, y_pred_prob,pos_label="Buy")
-
-# Create Logistic ROC Plot
+########################## Logistic Regression
+# Create Steps & Pipeline
+steps = [('scaler', StandardScaler()),
+('logistic', LogisticRegression())]
+pipeline = Pipeline(steps)
+# Hyperperameters
+penalty = ['none']
+parameters = {'logistic__penalty':penalty}
+# Fit and Evaluate
+GS_Log = GridSearchCV(pipeline,parameters)
+GS_Log.fit(X_train, y_train)
+GS_Log.score(X_test,y_test)
+y_pred = GS_Log.predict(X_test)
+classification_report(y_test, y_pred)
+# Create LOg ROC Curve Variables
+y_pred_prob = GS_Log.predict_proba(X_test)[:,0]
+fpr, tpr, thresholds = roc_curve(y_test, y_pred_prob, pos_label="Buy")
+# Create Logistic Regression ROC Plot
 plt.plot([0, 1], [0, 1], 'k--')
 plt.plot(fpr, tpr, label='Logistic Regression')
 plt.xlabel('False Positive Rate')
 plt.ylabel('True Positive Rate')
-plt.title('Logistic Reg. ROC Curve')
-plt.show()
+plt.title('Logistic Regression ROC Curve')
