@@ -210,7 +210,7 @@ parameters = {'forest__criterion':criterion,'forest__max_depth':max_depth,'fores
 #Fit and Evaluate
 GS_Forest = GridSearchCV(pipeline,parameters)
 GS_Forest.fit(X_train, y_train)
-print(GS_Forest.score(X_test,y_test))
+GS_Forest.score(X_test,y_test)
 y_pred = GS_Forest.predict(X_test)
 classification_report(y_test, y_pred)
 # Create Tree ROC Curve Variables
