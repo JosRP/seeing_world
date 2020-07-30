@@ -163,14 +163,7 @@ classification_report(y_test, y_pred)
 # Create Tree ROC Curve Variables
 y_pred_prob = GS_Tree.predict_proba(X_test)[:,0]
 GS_Tree.predict_proba(X_test)
-fpr, tpr, thresholds = roc_curve(y_test, y_pred_prob, pos_label="Buy")
-# Create Decision Tree ROC Plot
-plt.plot([0, 1], [0, 1], 'k--')
-plt.plot(fpr, tpr, label='Decision Tree')
-plt.xlabel('False Positive Rate')
-plt.ylabel('True Positive Rate')
-plt.title('Decision Tree ROC Curve')
-
+fpr_tree, tpr_tree, thresholds_tree = roc_curve(y_test, y_pred_prob, pos_label="Buy")
 
 ########################## Logistic Regression
 # Create Steps & Pipeline
