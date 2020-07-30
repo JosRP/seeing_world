@@ -182,8 +182,49 @@ classification_report(y_test, y_pred)
 # Create Log ROC Curve Variables
 y_pred_prob = GS_Log.predict_proba(X_test)[:,0]
 fpr_log, tpr_log, thresholds_log = roc_curve(y_test, y_pred_prob, pos_label="Buy")
+
+########################## Naive Bayes
+# Create Steps & Pipeline
+steps = [('scaler', StandardScaler()),
+('naive', GaussianNB())]
+pipeline = Pipeline(steps)
+# Hyperperameters
+##No Hyperperameters to tune
+# Fit and Evaluate
+pipeline.fit(X_train, y_train)
+pipeline.score(X_test,y_test)
+y_pred = pipeline.predict(X_test)
+classification_report(y_test, y_pred)
+# Create Log ROC Curve Variables
+y_pred_prob = pipeline.predict_proba(X_test)[:,0]
+fpr_NB, tpr_NB, thresholds_NB = roc_curve(y_test, y_pred_prob, pos_label="Buy")
+
+########################## Random Forest
+steps = [('scaler', StandardScaler()),
+('forest', RandomForestClassifier())]
+pipeline = Pipeline(steps)
+#Hyperperameters
+criterion = ['gini', 'entropy']
+max_depth = np.linspace(1, 32, 32, endpoint=True)
+parameters = {'forest__criterion':criterion,'forest__max_depth':max_depth,'forest__random_state':[1]}
+#Fit and Evaluate
+GS_Forest = GridSearchCV(pipeline,parameters)
+GS_Forest.fit(X_train, y_train)
+print(GS_Forest.score(X_test,y_test))
+y_pred = GS_Forest.predict(X_test)
+classification_report(y_test, y_pred)
+# Create Tree ROC Curve Variables
+y_pred_prob = GS_Forest.predict_proba(X_test)[:,0]
+GS_Forest.predict_proba(X_test)
+fpr_forest, tpr_forest, thresholds_forest = roc_curve(y_test, y_pred_prob, pos_label="Buy")
+
+# Create ROC Plots
 plt.plot([0, 1], [0, 1], 'k--')
-plt.plot(fpr, tpr, label='Logistic Regression')
+plt.plot(fpr_log, tpr_log, label='Logistic Regression')
+plt.plot(fpr_tree, tpr_tree, label='Decision Tree')
+plt.plot(fpr_NB, tpr_NB, label='Naive Bayes')
+plt.plot(fpr_forest, tpr_forest, label='Random Forest')
+plt.legend()
 plt.xlabel('False Positive Rate')
 plt.ylabel('True Positive Rate')
-plt.title('Logistic Regression ROC Curve')
+plt.title('ROC Curves')
