@@ -179,10 +179,9 @@ GS_Log.fit(X_train, y_train)
 GS_Log.score(X_test,y_test)
 y_pred = GS_Log.predict(X_test)
 classification_report(y_test, y_pred)
-# Create LOg ROC Curve Variables
+# Create Log ROC Curve Variables
 y_pred_prob = GS_Log.predict_proba(X_test)[:,0]
-fpr, tpr, thresholds = roc_curve(y_test, y_pred_prob, pos_label="Buy")
-# Create Logistic Regression ROC Plot
+fpr_log, tpr_log, thresholds_log = roc_curve(y_test, y_pred_prob, pos_label="Buy")
 plt.plot([0, 1], [0, 1], 'k--')
 plt.plot(fpr, tpr, label='Logistic Regression')
 plt.xlabel('False Positive Rate')
