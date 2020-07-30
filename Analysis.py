@@ -7,11 +7,13 @@ from sklearn.model_selection import cross_val_score
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import classification_report
+from sklearn.metrics import precision_score
 from sklearn.naive_bayes import GaussianNB
 from sklearn.metrics import roc_auc_score
 from sklearn.metrics import roc_curve, auc
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
+from sklearn.neighbors import KNeighborsClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.model_selection import GridSearchCV
 from sklearn.naive_bayes import GaussianNB
@@ -205,12 +207,12 @@ steps = [('scaler', StandardScaler()),
 pipeline = Pipeline(steps)
 #Hyperperameters
 criterion = ['gini', 'entropy']
-max_depth = np.linspace(1, 32, 32, endpoint=True)
-parameters = {'forest__criterion':criterion,'forest__max_depth':max_depth,'forest__random_state':[1]}
+max_depth = np.arange(5, 50, 2)
+parameters = {'forest__criterion':criterion,'forest__max_depth':max_depth, 'forest__random_state':[1]}
 #Fit and Evaluate
-GS_Forest = GridSearchCV(pipeline,parameters)
+GS_Forest = GridSearchCV(pipeline,parameters,scoring="precision_score")
 GS_Forest.fit(X_train, y_train)
-GS_Forest.score(X_test,y_test)
+print(GS_Forest.score(X_test,y_test))
 y_pred = GS_Forest.predict(X_test)
 classification_report(y_test, y_pred)
 # Create Tree ROC Curve Variables
@@ -218,12 +220,33 @@ y_pred_prob = GS_Forest.predict_proba(X_test)[:,0]
 GS_Forest.predict_proba(X_test)
 fpr_forest, tpr_forest, thresholds_forest = roc_curve(y_test, y_pred_prob, pos_label="Buy")
 
+########################## Random Forest
+steps = [('scaler', StandardScaler()),
+('Knn', KNeighborsClassifier())]
+pipeline = Pipeline(steps)
+#Hyperperameters
+weights = ['uniform', 'distance']
+algorithm = ['ball_tree','kd_tree','brute']
+n_neighbors = np.arange(5, 50, 2)
+parameters = {'Knn__algorithm':algorithm,'Knn__weights':weights,'Knn__n_neighbors':n_neighbors}
+#Fit and Evaluate
+GS_Knn = GridSearchCV(pipeline,parameters)
+GS_Knn.fit(X_train, y_train)
+GS_Knn.score(X_test,y_test)
+y_pred = GS_Knn.predict(X_test)
+classification_report(y_test, y_pred)
+# Create Tree ROC Curve Variables
+y_pred_prob = GS_Knn.predict_proba(X_test)[:,0]
+GS_Knn.predict_proba(X_test)
+fpr_Knn, tpr_Knn, thresholds_Knn = roc_curve(y_test, y_pred_prob, pos_label="Buy")
+
 # Create ROC Plots
 plt.plot([0, 1], [0, 1], 'k--')
 plt.plot(fpr_log, tpr_log, label='Logistic Regression')
 plt.plot(fpr_tree, tpr_tree, label='Decision Tree')
 plt.plot(fpr_NB, tpr_NB, label='Naive Bayes')
 plt.plot(fpr_forest, tpr_forest, label='Random Forest')
+plt.plot(fpr_Knn, tpr_Knn, label='KNN')
 plt.legend()
 plt.xlabel('False Positive Rate')
 plt.ylabel('True Positive Rate')
