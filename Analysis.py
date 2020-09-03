@@ -3,26 +3,21 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 from sklearn import tree
-from sklearn.model_selection import cross_val_score
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import confusion_matrix
-from sklearn.metrics import classification_report
-from sklearn.metrics import precision_score
+from sklearn.model_selection import cross_val_score, train_test_split, GridSearchCV
+from sklearn.metrics import confusion_matrix, classification_report, precision_score, roc_auc_score, auc, roc_curve
+from sklearn.neural_network import MLPClassifier
 from sklearn.naive_bayes import GaussianNB
-from sklearn.metrics import roc_auc_score
-from sklearn.metrics import roc_curve, auc
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.pipeline import Pipeline
-from sklearn.model_selection import GridSearchCV
-from sklearn.naive_bayes import GaussianNB
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.utils import resample
 from sklearn import preprocessing
 import yfinance as yf
 
-SPY = yf.download("SPY", start="2018-07-22", end="2020-07-22",actions=False)
-AMD = yf.download("AMD", start="2018-07-22", end="2020-07-22",actions=False)
+SPY = yf.download("SPY", start="2017-07-01", end="2020-07-31",actions=False)
+AMD = yf.download("AMD", start="2017-07-01", end="2020-07-31",actions=False)
 
 # Need find way to remove -2% if befoire max 5%
 
@@ -74,10 +69,12 @@ df_Total["Close_SPY"] = round(df_Total["Close_SPY"],2)
 
 # How much Max and Min Growth % next 5 days
 df_Total["Max(x)"] = round((df_Total["High"].rolling(days).max().shift(-5)/df_Total["Close"])-1,2)
-#df_Total["Min(x)"] = round((df_Total["High"].rolling(days).min().shift(-5)/df_Total["Close"])-1,2)
+df_Total["Min(x)"] = round((df_Total["Low"].rolling(days).min().shift(-5)/df_Total["Close"])-1,2)
 
-# Did Grown more than 5% next 5 days?
-df_Total["Target(x)"] = np.where(df_Total["Max(x)"]>=0.05, "Buy", "Not")
+# Did Grown more than 5% & decrese less than 2% next 5 days?
+df_Total["Target(x)"] = np.where(df_Total["Max(x)"]>=0.1, "Buy", "Not")
+
+df_Total.to_excel(r"C:\Users\jrpgo\Desktop\Check Target.xlsx")
 
 # Relative Volume last 10 days
 df_Total["Rel. Vol(10)"] = round(df_Total["Volume"]/(df_Total["Volume"].rolling(10).mean())-1,2)
@@ -122,50 +119,34 @@ df_Total['50>100_SPY'] = np.where(df_Total["MA(50)_SPY"]>df_Total["MA(100)_SPY"]
 df_Total['100>150_SPY'] = np.where(df_Total["MA(100)_SPY"]>df_Total["MA(150)_SPY"], "1", "0")
 df_Total['150>200_SPY'] = np.where(df_Total["MA(150)_SPY"]>df_Total["MA(200)_SPY"], "1", "0")
 
-# Clean columns
+# Remove NaN & Clean columns
+df_Total = df_Total.dropna()
 data=df_Total.loc[:,['Target(x)', 'Max(x)', 'Rel. Vol(10)',
        'Rel. Vol(10)_SPY', 'RSI', 'RSI_SPY', '5>10', '10>50', '50>100',
        '100>150', '150>200', '5>10_SPY', '10>50_SPY', '50>100_SPY',
        '100>150_SPY', '150>200_SPY']]
 
-# Remove NAN convert objects to int
-data = data.dropna()
+#  Convert objects to int
 cols=['5>10', '10>50', '50>100', '100>150', '150>200', '5>10_SPY', '10>50_SPY', '50>100_SPY', '100>150_SPY', '150>200_SPY']
 data[cols] = data[cols].apply(pd.to_numeric)
 
-# EDA
-sns.scatterplot(x='Rel. Vol(10)',y='Max(x)',data=data)
-plt.close()
-sns.scatterplot(x='RSI',y='Max(x)',data=data)
-plt.close()
-sns.boxplot(x='5>10',y='Max(x)',data=data)
-plt.close()
+# Create Final X pre-Balancing
+X_Final = data.drop(['Target(x)','Max(x)'],axis=1).values
+
+## Balance Data
+# Separate majority and minority classes
+data_majority = data[data['Target(x)']=="Not"]
+data_minority = data[data['Target(x)']=="Buy"]
+# Upsample minority class
+data_minority_upsampled = resample(data_minority, replace=True, n_samples=582, random_state=42)
+# Combine majority class with upsampled minority class
+data_balanced = pd.concat([data_majority, data_minority_upsampled])
 
 # Divide Features & target
-X = data.drop(['Target(x)','Max(x)'],axis=1).values
-y = data['Target(x)'].values
+X = data_balanced.drop(['Target(x)','Max(x)'],axis=1).values
+y = data_balanced['Target(x)'].values
 # Create train and test data. 42 for reproducibility
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42,stratify=y)
-
-########################## Decision Tree
-# Create Steps & Pipeline
-steps = [('scaler', StandardScaler()),
-('decisiontree', tree.DecisionTreeClassifier())]
-pipeline = Pipeline(steps)
-#Hyperperameters
-criterion = ['gini', 'entropy']
-max_depth = np.linspace(1, 32, 32, endpoint=True)
-parameters = {'decisiontree__criterion':criterion,'decisiontree__max_depth':max_depth,'decisiontree__random_state':[1]}
-#Fit and Evaluate
-GS_Tree = GridSearchCV(pipeline,parameters)
-GS_Tree.fit(X_train, y_train)
-GS_Tree.score(X_test,y_test)
-y_pred = GS_Tree.predict(X_test)
-classification_report(y_test, y_pred)
-# Create Tree ROC Curve Variables
-y_pred_prob = GS_Tree.predict_proba(X_test)[:,0]
-GS_Tree.predict_proba(X_test)
-fpr_tree, tpr_tree, thresholds_tree = roc_curve(y_test, y_pred_prob, pos_label="Buy")
 
 ########################## Logistic Regression
 # Create Steps & Pipeline
@@ -184,6 +165,8 @@ classification_report(y_test, y_pred)
 # Create Log ROC Curve Variables
 y_pred_prob = GS_Log.predict_proba(X_test)[:,0]
 fpr_log, tpr_log, thresholds_log = roc_curve(y_test, y_pred_prob, pos_label="Buy")
+LogisticRegression_AUC = auc(fpr_log, tpr_log)
+y_pred
 
 ########################## Naive Bayes
 # Create Steps & Pipeline
@@ -200,6 +183,7 @@ classification_report(y_test, y_pred)
 # Create Log ROC Curve Variables
 y_pred_prob = pipeline.predict_proba(X_test)[:,0]
 fpr_NB, tpr_NB, thresholds_NB = roc_curve(y_test, y_pred_prob, pos_label="Buy")
+NaiveBayes_AUC = auc(fpr_NB, tpr_NB)
 
 ########################## Random Forest
 steps = [('scaler', StandardScaler()),
@@ -210,44 +194,84 @@ criterion = ['gini', 'entropy']
 max_depth = np.arange(5, 50, 2)
 parameters = {'forest__criterion':criterion,'forest__max_depth':max_depth, 'forest__random_state':[1]}
 #Fit and Evaluate
-GS_Forest = GridSearchCV(pipeline,parameters,scoring="precision_score")
+GS_Forest = GridSearchCV(pipeline,parameters)
 GS_Forest.fit(X_train, y_train)
-print(GS_Forest.score(X_test,y_test))
 y_pred = GS_Forest.predict(X_test)
-classification_report(y_test, y_pred)
-# Create Tree ROC Curve Variables
+report = classification_report(y_test, y_pred)
+# Create Forest ROC Curve Variables
 y_pred_prob = GS_Forest.predict_proba(X_test)[:,0]
-GS_Forest.predict_proba(X_test)
 fpr_forest, tpr_forest, thresholds_forest = roc_curve(y_test, y_pred_prob, pos_label="Buy")
+RandomForest_AUC = auc(fpr_forest, tpr_forest)
 
-########################## Random Forest
+########################## KNN
 steps = [('scaler', StandardScaler()),
 ('Knn', KNeighborsClassifier())]
 pipeline = Pipeline(steps)
-#Hyperperameters
+# Hyperperameters
 weights = ['uniform', 'distance']
 algorithm = ['ball_tree','kd_tree','brute']
 n_neighbors = np.arange(5, 50, 2)
 parameters = {'Knn__algorithm':algorithm,'Knn__weights':weights,'Knn__n_neighbors':n_neighbors}
-#Fit and Evaluate
+# Fit and Evaluate
 GS_Knn = GridSearchCV(pipeline,parameters)
 GS_Knn.fit(X_train, y_train)
 GS_Knn.score(X_test,y_test)
 y_pred = GS_Knn.predict(X_test)
 classification_report(y_test, y_pred)
-# Create Tree ROC Curve Variables
+# Create Knn ROC Curve Variables
 y_pred_prob = GS_Knn.predict_proba(X_test)[:,0]
 GS_Knn.predict_proba(X_test)
 fpr_Knn, tpr_Knn, thresholds_Knn = roc_curve(y_test, y_pred_prob, pos_label="Buy")
+Knn_AUC = auc(fpr_Knn, tpr_Knn)
+
+########################## Neural Network
+steps = [('scaler', StandardScaler()),
+('MLP', MLPClassifier())]
+pipeline = Pipeline(steps)
+# Hyperperameters
+hidden_layer_sizes = [(50,50,50), (50,100,50)]
+solver = ['lbfgs']
+alpha = [0.0001,0.001,0.01,0.1]
+learning_rate = ['constant','adaptive']
+parameters = {'MLP__hidden_layer_sizes':hidden_layer_sizes,'MLP__solver':solver,'MLP__alpha':alpha,'MLP__learning_rate':learning_rate,'MLP__random_state':[1],'MLP__max_iter':[10000]}
+# Fit and Evaluate
+GS_MLP = GridSearchCV(pipeline,parameters)
+GS_MLP.fit(X_train, y_train)
+GS_MLP.score(X_test, y_test)
+y_pred = GS_MLP.predict(X_test)
+classification_report(y_test, y_pred)
+# Create Knn ROC Curve Variables
+y_pred_prob = GS_MLP.predict_proba(X_test)[:,0]
+GS_MLP.predict_proba(X_test)
+fpr_MLP, tpr_MLP, thresholds_MLP = roc_curve(y_test, y_pred_prob, pos_label="Buy")
+MLP_AUC = auc(fpr_MLP, tpr_MLP)
+
+# Track AUC scores
+AUC_scores =  [['Logistic Regression',LogisticRegression_AUC],
+                ['Naive Bayes',NaiveBayes_AUC],
+                ['Random Forest',RandomForest_AUC],
+                ['Knn',Knn_AUC],
+                ['MLP',MLP_AUC]]
+scores_df = pd.DataFrame(AUC_scores,columns = ['Algorithm', 'AUC'])
 
 # Create ROC Plots
 plt.plot([0, 1], [0, 1], 'k--')
 plt.plot(fpr_log, tpr_log, label='Logistic Regression')
-plt.plot(fpr_tree, tpr_tree, label='Decision Tree')
 plt.plot(fpr_NB, tpr_NB, label='Naive Bayes')
 plt.plot(fpr_forest, tpr_forest, label='Random Forest')
 plt.plot(fpr_Knn, tpr_Knn, label='KNN')
+plt.plot(fpr_MLP, tpr_MLP, label='MLP')
 plt.legend()
 plt.xlabel('False Positive Rate')
 plt.ylabel('True Positive Rate')
 plt.title('ROC Curves')
+
+
+# Extract Results from Random forest
+prediction = GS_Forest.predict(X_Final)
+prediction_perce = GS_Forest.predict_proba(X_Final)[:,0]
+df_prediction = pd.DataFrame(prediction)
+df_prediction_perce = pd.DataFrame(prediction_perce)
+df_prediction.to_excel(r'C:\Users\jrpgo\Desktop\results.xlsx')
+df_prediction_perce.to_excel(r'C:\Users\jrpgo\Desktop\results_perce.xlsx')
+df_Total.to_excel(r'C:\Users\jrpgo\Desktop\Full.xlsx')
