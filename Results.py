@@ -128,7 +128,7 @@ data[cols] = data[cols].apply(pd.to_numeric)
 
 ## Iterate over each model results
 # Model list (imilar to other script)
-model_list = {'Logistic','Naive_Bayes','Random_Forest','Knn','Neural_Net'}
+model_list = {'Naive_Bayes','Random_Forest','Knn','Neural_Net'}
 # Iterations
 for i in model_list:
     model = pickle.load(open('C:/Users/jrpgo/OneDrive - Rigor Consultoria e Gestão, SA/Pessoal/Python/Stocks/'+ str(i) + '.sav', 'rb'))

@@ -40,7 +40,7 @@ def chrono_var(days,df,close_column,low_column,high_column,minimum,maximum):
                 continue
     return df
 
-first_day = "2000-01-01"
+first_day = "2010-01-01"
 last_day = "2020-09-10"
 
 SPY = yf.download("SPY", start=first_day, end=last_day,actions=False)
@@ -86,7 +86,7 @@ df_Total["MA(150)_SPY"] = round(df_Total["Close_SPY"].rolling(150).mean(),2)
 df_Total["MA(200)_SPY"] = round(df_Total["Close_SPY"].rolling(200).mean(),2)
 
 # Create Label/Target variable
-df_Total = chrono_var(5,df_Total,"Close","Low","High",-0.02,0.05)
+df_Total = chrono_var(5,df_Total,"Close","Low","High",-0.02,0.1)
 
 # Relative Volume last 10 days
 df_Total["Rel. Vol(10)"] = round(df_Total["Volume"]/(df_Total["Volume"].rolling(10).mean())-1,2)
@@ -130,17 +130,29 @@ df_Total['10>50_SPY'] = np.where(df_Total["MA(10)_SPY"]>df_Total["MA(50)_SPY"], 
 df_Total['50>100_SPY'] = np.where(df_Total["MA(50)_SPY"]>df_Total["MA(100)_SPY"], "1", "0")
 df_Total['100>150_SPY'] = np.where(df_Total["MA(100)_SPY"]>df_Total["MA(150)_SPY"], "1", "0")
 df_Total['150>200_SPY'] = np.where(df_Total["MA(150)_SPY"]>df_Total["MA(200)_SPY"], "1", "0")
+
+# Low, High, Open Relative Position to Close
+df_Total['Low Pos'] = round(df_Total['Low']/df_Total['Close']-1,2)
+df_Total['High Pos'] = round(df_Total['High']/df_Total['Close']-1,2)
+df_Total['Open Pos'] = round(df_Total['Open']/df_Total['Close']-1,2)
+
+df_Total['Low Pos_SPY'] = round(df_Total['Low_SPY']/df_Total['Close_SPY']-1,2)
+df_Total['High Pos_SPY'] = round(df_Total['High_SPY']/df_Total['Close_SPY']-1,2)
+df_Total['Open Pos_SPY'] = round(df_Total['Open_SPY']/df_Total['Close_SPY']-1,2)
+
 # Remove NaN & Clean columns
 df_Total = df_Total.dropna()
-data=df_Total.loc[:,['Target(x)', 'Rel. Vol(10)',
-       'Rel. Vol(10)_SPY', 'RSI', 'RSI_SPY', '5>10', '10>50', '50>100',
-       '100>150', '150>200', '5>10_SPY', '10>50_SPY', '50>100_SPY',
-       '100>150_SPY', '150>200_SPY']]
+data=df_Total.loc[:,['MA(5)', 'MA(10)',
+       'MA(50)', 'MA(100)', 'MA(150)', 'MA(200)', 'MA(5)_SPY', 'MA(10)_SPY',
+       'MA(50)_SPY', 'MA(100)_SPY', 'MA(150)_SPY', 'MA(200)_SPY', 'Target(x)',
+       'Rel. Vol(10)', 'Rel. Vol(10)_SPY', 'RSI', 'RSI_SPY', '5>10', '10>50',
+       '50>100', '100>150', '150>200', '5>10_SPY', '10>50_SPY', '50>100_SPY',
+       '100>150_SPY', '150>200_SPY', 'Low Pos', 'High Pos', 'Open Pos',
+       'Low Pos_SPY', 'High Pos_SPY', 'Open Pos_SPY']]
 
 #  Convert objects to int
 cols=['5>10', '10>50', '50>100', '100>150', '150>200', '5>10_SPY', '10>50_SPY', '50>100_SPY', '100>150_SPY', '150>200_SPY']
 data[cols] = data[cols].apply(pd.to_numeric)
-
 
 ## Split Train Test ORDERED
 train, test= np.split(data, [int(.70 *len(data))])
@@ -183,7 +195,7 @@ steps = [('scaler', StandardScaler()),
 pipeline = Pipeline(steps)
 # Hyperperameters
 penalty = ['none']
-parameters = {'logistic__penalty':penalty}
+parameters = {'logistic__penalty':penalty,'logistic__max_iter':[1000]}
 # Fit and Evaluate
 GS_Log = GridSearchCV(pipeline,parameters)
 GS_Log.fit(X_train, y_train)
@@ -194,7 +206,6 @@ classification_report(y_test, y_pred)
 y_pred_prob = GS_Log.predict_proba(X_test)[:,0]
 fpr_log, tpr_log, thresholds_log = roc_curve(y_test, y_pred_prob, pos_label="Buy")
 LogisticRegression_AUC = auc(fpr_log, tpr_log)
-
 
 ########################## Naive Bayes
 # Create Steps & Pipeline
@@ -274,6 +285,7 @@ GS_MLP.predict_proba(X_test)
 fpr_MLP, tpr_MLP, thresholds_MLP = roc_curve(y_test, y_pred_prob, pos_label="Buy")
 MLP_AUC = auc(fpr_MLP, tpr_MLP)
 
+
 # Track AUC scores
 AUC_scores =  [['Logistic Regression',LogisticRegression_AUC],
                 ['Naive Bayes',NaiveBayes_AUC],
@@ -296,7 +308,7 @@ plt.title('ROC Curves')
 
 ## Export All Models
 # Model dictionary
-model_dict = {'Logistic':GS_Log,'Naive_Bayes':pipeline_NB,'Random_Forest':GS_Forest,'Knn':GS_Knn,'Neural_Net':GS_MLP}
+model_dict = {'Logistic':GS_Log, 'Naive_Bayes':pipeline_NB,'Random_Forest':GS_Forest,'Knn':GS_Knn,'Neural_Net':GS_MLP}
 # Iterate over each model
 for key in model_dict:
     filename = 'C:/Users/jrpgo/OneDrive - Rigor Consultoria e Gestão, SA/Pessoal/Python/Stocks/' + str(key) +'.sav'
