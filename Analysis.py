@@ -40,8 +40,8 @@ def chrono_var(days,df,close_column,low_column,high_column,minimum,maximum):
                 continue
     return df
 
-first_day = "2017-01-01"
-last_day = "2019-12-31"
+first_day = "2000-01-01"
+last_day = "2020-09-10"
 
 SPY = yf.download("SPY", start=first_day, end=last_day,actions=False)
 AMD = yf.download("AMD", start=first_day, end=last_day,actions=False)
@@ -86,7 +86,7 @@ df_Total["MA(150)_SPY"] = round(df_Total["Close_SPY"].rolling(150).mean(),2)
 df_Total["MA(200)_SPY"] = round(df_Total["Close_SPY"].rolling(200).mean(),2)
 
 # Create Label/Target variable
-df_Total = chrono_var(5,df_Total,"Close","Low","High",-0.02,0.1)
+df_Total = chrono_var(5,df_Total,"Close","Low","High",-0.02,0.05)
 
 # Relative Volume last 10 days
 df_Total["Rel. Vol(10)"] = round(df_Total["Volume"]/(df_Total["Volume"].rolling(10).mean())-1,2)
@@ -141,29 +141,40 @@ data=df_Total.loc[:,['Target(x)', 'Rel. Vol(10)',
 cols=['5>10', '10>50', '50>100', '100>150', '150>200', '5>10_SPY', '10>50_SPY', '50>100_SPY', '100>150_SPY', '150>200_SPY']
 data[cols] = data[cols].apply(pd.to_numeric)
 
-# Divide Features & target
-X = data.drop(['Target(x)'],axis=1)
-y = data['Target(x)']
-# Create train and test data. 42 for reproducibility
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42,stratify=y)
 
-# Split Train Test ordered
+## Split Train Test ORDERED
 train, test= np.split(data, [int(.70 *len(data))])
 # Split test features and labels
 X_test = test.drop(['Target(x)'],axis=1)
 y_test = test['Target(x)']
-
 ## Balance Data
 # separate minority and majority classes
-data_majority = train[train['Target(x)']=="Not"]
-data_minority = train[train['Target(x)']=="Buy"]
+train_majority = train[train['Target(x)']=="Not"]
+train_minority = train[train['Target(x)']=="Buy"]
 # upsample minority, 42 for reproducibility
-minority_upsample = resample(data_minority,replace=True, n_samples=len(data_majority), random_state=42)
+minority_upsample = resample(train_minority,replace=True, n_samples=len(train_majority), random_state=42)
 # combine majority and upsampled minority
-train_balanced = pd.concat([data_majority, minority_upsample])
+train_balanced = pd.concat([train_majority, minority_upsample])
 # Split train features and labels
 X_train =  train_balanced.drop(['Target(x)'],axis=1)
 y_train = train_balanced['Target(x)']
+
+# ## Split Train Test UNORDERED
+# # Divide Features & target
+# X = data.drop(['Target(x)'],axis=1)
+# y = data['Target(x)']
+# # Create train and test data. 42 for reproducibility
+# X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42,stratify=y)
+# # Rejoin features and targets - train
+# train = pd.concat([X_train, y_train], axis=1)
+# train_majority = train[train['Target(x)']=="Not"]
+# train_minority = train[train['Target(x)']=="Buy"]
+# minority_upsample = resample(train_minority,replace=True, n_samples=len(train_majority), random_state=42)
+# # combine majority and upsampled minority
+# train_balanced = pd.concat([train_majority, minority_upsample])
+# # Split train features and labels
+# X_train =  train_balanced.drop(['Target(x)'],axis=1)
+# y_train = train_balanced['Target(x)']
 
 ########################## Logistic Regression
 # Create Steps & Pipeline
@@ -183,22 +194,22 @@ classification_report(y_test, y_pred)
 y_pred_prob = GS_Log.predict_proba(X_test)[:,0]
 fpr_log, tpr_log, thresholds_log = roc_curve(y_test, y_pred_prob, pos_label="Buy")
 LogisticRegression_AUC = auc(fpr_log, tpr_log)
-y_pred
+
 
 ########################## Naive Bayes
 # Create Steps & Pipeline
 steps = [('scaler', StandardScaler()),
 ('naive', GaussianNB())]
-pipeline = Pipeline(steps)
+pipeline_NB = Pipeline(steps)
 # Hyperperameters
 ##No Hyperperameters to tune
 # Fit and Evaluate
-pipeline.fit(X_train, y_train)
-pipeline.score(X_test,y_test)
-y_pred = pipeline.predict(X_test)
+pipeline_NB.fit(X_train, y_train)
+pipeline_NB.score(X_test,y_test)
+y_pred = pipeline_NB.predict(X_test)
 classification_report(y_test, y_pred)
 # Create Log ROC Curve Variables
-y_pred_prob = pipeline.predict_proba(X_test)[:,0]
+y_pred_prob = pipeline_NB.predict_proba(X_test)[:,0]
 fpr_NB, tpr_NB, thresholds_NB = roc_curve(y_test, y_pred_prob, pos_label="Buy")
 NaiveBayes_AUC = auc(fpr_NB, tpr_NB)
 
@@ -271,8 +282,6 @@ AUC_scores =  [['Logistic Regression',LogisticRegression_AUC],
                 ['MLP',MLP_AUC]]
 scores_df = pd.DataFrame(AUC_scores,columns = ['Algorithm', 'AUC'])
 scores_df
-
-
 # Create ROC Plots
 plt.plot([0, 1], [0, 1], 'k--')
 plt.plot(fpr_log, tpr_log, label='Logistic Regression')
@@ -285,19 +294,10 @@ plt.xlabel('False Positive Rate')
 plt.ylabel('True Positive Rate')
 plt.title('ROC Curves')
 
-# Extract Results from Random forest
-prediction = GS_Forest.predict(X_Final)
-prediction_perce = GS_Forest.predict_proba(X_Final)[:,0]
-df_prediction = pd.DataFrame(prediction)
-df_prediction_perce = pd.DataFrame(prediction_perce)
-df_prediction.to_excel(r'C:\Users\jrpgo\Desktop\results.xlsx')
-df_prediction_perce.to_excel(r'C:\Users\jrpgo\Desktop\results_perce.xlsx')
-df_Total.to_excel(r'C:\Users\jrpgo\Desktop\Full.xlsx')
-
-# Export All
-
-
-
-
-filename = r'C:\Users\jrpgo\OneDrive - Rigor Consultoria e Gestão, SA\Pessoal\Python\Stocks\Random Forest.sav'
-pickle.dump(GS_Forest, open(filename, 'wb'))
+## Export All Models
+# Model dictionary
+model_dict = {'Logistic':GS_Log,'Naive_Bayes':pipeline_NB,'Random_Forest':GS_Forest,'Knn':GS_Knn,'Neural_Net':GS_MLP}
+# Iterate over each model
+for key in model_dict:
+    filename = 'C:/Users/jrpgo/OneDrive - Rigor Consultoria e Gestão, SA/Pessoal/Python/Stocks/' + str(key) +'.sav'
+    pickle.dump(model_dict[key], open(filename, 'wb'))
