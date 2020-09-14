@@ -3,7 +3,7 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 from sklearn import tree
-from sklearn.model_selection import cross_val_score, train_test_split, GridSearchCV
+from sklearn.model_selection import cross_val_score, train_test_split, GridSearchCV,PredefinedSplit
 from sklearn.metrics import confusion_matrix, classification_report, precision_score, roc_auc_score, auc, roc_curve
 from sklearn.neural_network import MLPClassifier
 from sklearn.naive_bayes import GaussianNB
@@ -13,10 +13,13 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.utils import resample
+from sklearn.svm import SVC
 from sklearn import preprocessing
+import dask_ml.model_selection as dcv
 import yfinance as yf
 import pickle
 import itertools
+
 
 # Define Functions
 def chrono_var(days,df,close_column,low_column,high_column,minimum,maximum):
@@ -171,6 +174,9 @@ train_balanced = pd.concat([train_majority, minority_upsample])
 X_train =  train_balanced.drop(['Target(x)'],axis=1)
 y_train = train_balanced['Target(x)']
 
+# Force Split
+split_index = [-1 if x in X_train.index else 0 for x in data.index]
+pds = PredefinedSplit(test_fold = split_index)
 # ## Split Train Test UNORDERED
 # # Divide Features & target
 # X = data.drop(['Target(x)'],axis=1)
@@ -197,11 +203,11 @@ pipeline = Pipeline(steps)
 penalty = ['none']
 parameters = {'logistic__penalty':penalty,'logistic__max_iter':[1000]}
 # Fit and Evaluate
-GS_Log = GridSearchCV(pipeline,parameters)
+GS_Log = dcv.GridSearchCV(pipeline,parameters,scheduler='threading')
 GS_Log.fit(X_train, y_train)
 GS_Log.score(X_test,y_test)
 y_pred = GS_Log.predict(X_test)
-classification_report(y_test, y_pred)
+Logistic_report = classification_report(y_test, y_pred)
 # Create Log ROC Curve Variables
 y_pred_prob = GS_Log.predict_proba(X_test)[:,0]
 fpr_log, tpr_log, thresholds_log = roc_curve(y_test, y_pred_prob, pos_label="Buy")
@@ -218,7 +224,7 @@ pipeline_NB = Pipeline(steps)
 pipeline_NB.fit(X_train, y_train)
 pipeline_NB.score(X_test,y_test)
 y_pred = pipeline_NB.predict(X_test)
-classification_report(y_test, y_pred)
+NB_report = classification_report(y_test, y_pred)
 # Create Log ROC Curve Variables
 y_pred_prob = pipeline_NB.predict_proba(X_test)[:,0]
 fpr_NB, tpr_NB, thresholds_NB = roc_curve(y_test, y_pred_prob, pos_label="Buy")
@@ -233,10 +239,10 @@ criterion = ['gini', 'entropy']
 max_depth = np.arange(5, 50, 2)
 parameters = {'forest__criterion':criterion,'forest__max_depth':max_depth, 'forest__random_state':[1]}
 #Fit and Evaluate
-GS_Forest = GridSearchCV(pipeline,parameters)
+GS_Forest = dcv.GridSearchCV(pipeline,parameters,scheduler='threading')
 GS_Forest.fit(X_train, y_train)
 y_pred = GS_Forest.predict(X_test)
-report = classification_report(y_test, y_pred)
+RandomForest_report =  classification_report(y_test, y_pred)
 # Create Forest ROC Curve Variables
 y_pred_prob = GS_Forest.predict_proba(X_test)[:,0]
 fpr_forest, tpr_forest, thresholds_forest = roc_curve(y_test, y_pred_prob, pos_label="Buy")
@@ -252,11 +258,11 @@ algorithm = ['ball_tree','kd_tree','brute']
 n_neighbors = np.arange(5, 50, 2)
 parameters = {'Knn__algorithm':algorithm,'Knn__weights':weights,'Knn__n_neighbors':n_neighbors}
 # Fit and Evaluate
-GS_Knn = GridSearchCV(pipeline,parameters)
+GS_Knn = dcv.GridSearchCV(pipeline,parameters,scheduler='threading')
 GS_Knn.fit(X_train, y_train)
 GS_Knn.score(X_test,y_test)
 y_pred = GS_Knn.predict(X_test)
-classification_report(y_test, y_pred)
+Knn_report = classification_report(y_test, y_pred)
 # Create Knn ROC Curve Variables
 y_pred_prob = GS_Knn.predict_proba(X_test)[:,0]
 GS_Knn.predict_proba(X_test)
@@ -274,24 +280,45 @@ alpha = [0.0001,0.001,0.01,0.1]
 learning_rate = ['constant','adaptive']
 parameters = {'MLP__hidden_layer_sizes':hidden_layer_sizes,'MLP__solver':solver,'MLP__alpha':alpha,'MLP__learning_rate':learning_rate,'MLP__random_state':[1],'MLP__max_iter':[10000]}
 # Fit and Evaluate
-GS_MLP = GridSearchCV(pipeline,parameters)
+GS_MLP = dcv.GridSearchCV(pipeline,parameters,scheduler='threading')
 GS_MLP.fit(X_train, y_train)
 GS_MLP.score(X_test, y_test)
 y_pred = GS_MLP.predict(X_test)
-classification_report(y_test, y_pred)
+MLP_report = classification_report(y_test, y_pred)
 # Create Knn ROC Curve Variables
 y_pred_prob = GS_MLP.predict_proba(X_test)[:,0]
 GS_MLP.predict_proba(X_test)
 fpr_MLP, tpr_MLP, thresholds_MLP = roc_curve(y_test, y_pred_prob, pos_label="Buy")
 MLP_AUC = auc(fpr_MLP, tpr_MLP)
 
+########################## SVM
+steps = [('scaler', StandardScaler()),
+('SVM', SVC())]
+pipeline = Pipeline(steps)
+# Hyperperameters
+C = [0.1, 1, 10, 100, 1000]
+gamma = [1, 0.1, 0.01, 0.001, 0.0001]
+kernel = ['linear', 'poly']
+parameters = {'SVM__C':C, 'SVM__gamma':gamma, 'SVM__kernel':kernel, 'SVM__random_state':[42],'SVM__probability':[True]}
+# Fit and Evaluate
+GS_SVM = dcv.RandomizedSearchCV(pipeline,parameters,scheduler='threading',random_state=42, n_iter=20)
+GS_SVM.fit(X_train, y_train)
+GS_SVM.score(X_test, y_test)
+y_pred = GS_SVM.predict(X_test)
+SVM_report =  classification_report(y_test, y_pred)
+# Create Knn ROC Curve Variables
+y_pred_prob = GS_SVM.predict_proba(X_test)[:,0]
+GS_SVM.predict_proba(X_test)
+fpr_SVM, tpr_SVM, thresholds_SVM = roc_curve(y_test, y_pred_prob, pos_label="Buy")
+SVM_AUC = auc(fpr_SVM, tpr_SVM)
 
 # Track AUC scores
 AUC_scores =  [['Logistic Regression',LogisticRegression_AUC],
                 ['Naive Bayes',NaiveBayes_AUC],
                 ['Random Forest',RandomForest_AUC],
                 ['Knn',Knn_AUC],
-                ['MLP',MLP_AUC]]
+                ['MLP',MLP_AUC],
+                ['SVM',SVM_AUC]]
 scores_df = pd.DataFrame(AUC_scores,columns = ['Algorithm', 'AUC'])
 scores_df
 # Create ROC Plots
@@ -301,6 +328,7 @@ plt.plot(fpr_NB, tpr_NB, label='Naive Bayes')
 plt.plot(fpr_forest, tpr_forest, label='Random Forest')
 plt.plot(fpr_Knn, tpr_Knn, label='KNN')
 plt.plot(fpr_MLP, tpr_MLP, label='MLP')
+plt.plot(fpr_SVM, tpr_SVM, label='SVM')
 plt.legend()
 plt.xlabel('False Positive Rate')
 plt.ylabel('True Positive Rate')
