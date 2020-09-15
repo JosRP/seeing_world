@@ -201,9 +201,11 @@ steps = [('scaler', StandardScaler()),
 pipeline = Pipeline(steps)
 # Hyperperameters
 penalty = ['none']
-parameters = {'logistic__penalty':penalty,'logistic__max_iter':[1000]}
+C = np.logspace(-4, 4, 20)
+solver = ['lbfgs']
+parameters = {'logistic__penalty':penalty,'logistic__C':C,'logistic__solver':solver,'logistic__max_iter':[5000]}
 # Fit and Evaluate
-GS_Log = dcv.GridSearchCV(pipeline,parameters,scheduler='threading')
+GS_Log = dcv.GridSearchCV(pipeline,parameters,scheduler='threading',cv=pds,error_score=0.0,scoring='roc_auc')
 GS_Log.fit(X_train, y_train)
 GS_Log.score(X_test,y_test)
 y_pred = GS_Log.predict(X_test)
@@ -212,23 +214,6 @@ Logistic_report = classification_report(y_test, y_pred)
 y_pred_prob = GS_Log.predict_proba(X_test)[:,0]
 fpr_log, tpr_log, thresholds_log = roc_curve(y_test, y_pred_prob, pos_label="Buy")
 LogisticRegression_AUC = auc(fpr_log, tpr_log)
-
-########################## Naive Bayes
-# Create Steps & Pipeline
-steps = [('scaler', StandardScaler()),
-('naive', GaussianNB())]
-pipeline_NB = Pipeline(steps)
-# Hyperperameters
-##No Hyperperameters to tune
-# Fit and Evaluate
-pipeline_NB.fit(X_train, y_train)
-pipeline_NB.score(X_test,y_test)
-y_pred = pipeline_NB.predict(X_test)
-NB_report = classification_report(y_test, y_pred)
-# Create Log ROC Curve Variables
-y_pred_prob = pipeline_NB.predict_proba(X_test)[:,0]
-fpr_NB, tpr_NB, thresholds_NB = roc_curve(y_test, y_pred_prob, pos_label="Buy")
-NaiveBayes_AUC = auc(fpr_NB, tpr_NB)
 
 ########################## Random Forest
 steps = [('scaler', StandardScaler()),
@@ -239,7 +224,7 @@ criterion = ['gini', 'entropy']
 max_depth = np.arange(5, 50, 2)
 parameters = {'forest__criterion':criterion,'forest__max_depth':max_depth, 'forest__random_state':[1]}
 #Fit and Evaluate
-GS_Forest = dcv.GridSearchCV(pipeline,parameters,scheduler='threading')
+GS_Forest = dcv.GridSearchCV(pipeline,parameters,scheduler='threading',cv=pds,scoring='roc_auc')
 GS_Forest.fit(X_train, y_train)
 y_pred = GS_Forest.predict(X_test)
 RandomForest_report =  classification_report(y_test, y_pred)
@@ -258,7 +243,7 @@ algorithm = ['ball_tree','kd_tree','brute']
 n_neighbors = np.arange(5, 50, 2)
 parameters = {'Knn__algorithm':algorithm,'Knn__weights':weights,'Knn__n_neighbors':n_neighbors}
 # Fit and Evaluate
-GS_Knn = dcv.GridSearchCV(pipeline,parameters,scheduler='threading')
+GS_Knn = dcv.GridSearchCV(pipeline,parameters,scheduler='threading',cv=pds,scoring='roc_auc')
 GS_Knn.fit(X_train, y_train)
 GS_Knn.score(X_test,y_test)
 y_pred = GS_Knn.predict(X_test)
@@ -278,9 +263,9 @@ hidden_layer_sizes = [(50,50,50), (50,100,50)]
 solver = ['lbfgs']
 alpha = [0.0001,0.001,0.01,0.1]
 learning_rate = ['constant','adaptive']
-parameters = {'MLP__hidden_layer_sizes':hidden_layer_sizes,'MLP__solver':solver,'MLP__alpha':alpha,'MLP__learning_rate':learning_rate,'MLP__random_state':[1],'MLP__max_iter':[10000]}
+parameters = {'MLP__hidden_layer_sizes':hidden_layer_sizes,'MLP__solver':solver,'MLP__alpha':alpha,'MLP__learning_rate':learning_rate,'MLP__random_state':[42],'MLP__max_iter':[10000]}
 # Fit and Evaluate
-GS_MLP = dcv.GridSearchCV(pipeline,parameters,scheduler='threading')
+GS_MLP = dcv.GridSearchCV(pipeline,parameters,scheduler='threading',cv=pds,scoring='roc_auc')
 GS_MLP.fit(X_train, y_train)
 GS_MLP.score(X_test, y_test)
 y_pred = GS_MLP.predict(X_test)
@@ -301,7 +286,7 @@ gamma = [1, 0.1, 0.01, 0.001, 0.0001]
 kernel = ['linear', 'poly']
 parameters = {'SVM__C':C, 'SVM__gamma':gamma, 'SVM__kernel':kernel, 'SVM__random_state':[42],'SVM__probability':[True]}
 # Fit and Evaluate
-GS_SVM = dcv.RandomizedSearchCV(pipeline,parameters,scheduler='threading',random_state=42, n_iter=20)
+GS_SVM = dcv.RandomizedSearchCV(pipeline,parameters,scheduler='threading',random_state=42, n_iter=20,cv=pds,scoring='roc_auc')
 GS_SVM.fit(X_train, y_train)
 GS_SVM.score(X_test, y_test)
 y_pred = GS_SVM.predict(X_test)
@@ -314,7 +299,6 @@ SVM_AUC = auc(fpr_SVM, tpr_SVM)
 
 # Track AUC scores
 AUC_scores =  [['Logistic Regression',LogisticRegression_AUC],
-                ['Naive Bayes',NaiveBayes_AUC],
                 ['Random Forest',RandomForest_AUC],
                 ['Knn',Knn_AUC],
                 ['MLP',MLP_AUC],
@@ -336,7 +320,7 @@ plt.title('ROC Curves')
 
 ## Export All Models
 # Model dictionary
-model_dict = {'Logistic':GS_Log, 'Naive_Bayes':pipeline_NB,'Random_Forest':GS_Forest,'Knn':GS_Knn,'Neural_Net':GS_MLP}
+model_dict = {'Logistic':GS_Log, 'Random_Forest':GS_Forest,'Knn':GS_Knn,'Neural_Net':GS_MLP}
 # Iterate over each model
 for key in model_dict:
     filename = 'C:/Users/jrpgo/OneDrive - Rigor Consultoria e Gestão, SA/Pessoal/Python/Stocks/' + str(key) +'.sav'
