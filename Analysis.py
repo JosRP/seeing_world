@@ -89,7 +89,7 @@ df_Total["MA(150)_SPY"] = round(df_Total["Close_SPY"].rolling(150).mean(),2)
 df_Total["MA(200)_SPY"] = round(df_Total["Close_SPY"].rolling(200).mean(),2)
 
 # Create Label/Target variable
-df_Total = chrono_var(5,df_Total,"Close","Low","High",-0.02,0.1)
+df_Total = chrono_var(5,df_Total,"Close","Low","High",-0.02,0.05)
 
 # Relative Volume last 10 days
 df_Total["Rel. Vol(10)"] = round(df_Total["Volume"]/(df_Total["Volume"].rolling(10).mean())-1,2)
@@ -177,22 +177,6 @@ y_train = train_balanced['Target(x)']
 # Force Split
 split_index = [-1 if x in X_train.index else 0 for x in data.index]
 pds = PredefinedSplit(test_fold = split_index)
-# ## Split Train Test UNORDERED
-# # Divide Features & target
-# X = data.drop(['Target(x)'],axis=1)
-# y = data['Target(x)']
-# # Create train and test data. 42 for reproducibility
-# X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42,stratify=y)
-# # Rejoin features and targets - train
-# train = pd.concat([X_train, y_train], axis=1)
-# train_majority = train[train['Target(x)']=="Not"]
-# train_minority = train[train['Target(x)']=="Buy"]
-# minority_upsample = resample(train_minority,replace=True, n_samples=len(train_majority), random_state=42)
-# # combine majority and upsampled minority
-# train_balanced = pd.concat([train_majority, minority_upsample])
-# # Split train features and labels
-# X_train =  train_balanced.drop(['Target(x)'],axis=1)
-# y_train = train_balanced['Target(x)']
 
 ########################## Logistic Regression
 # Create Steps & Pipeline
@@ -205,7 +189,7 @@ C = np.logspace(-4, 4, 20)
 solver = ['lbfgs']
 parameters = {'logistic__penalty':penalty,'logistic__C':C,'logistic__solver':solver,'logistic__max_iter':[5000]}
 # Fit and Evaluate
-GS_Log = dcv.GridSearchCV(pipeline,parameters,scheduler='threading',cv=pds,error_score=0.0,scoring='roc_auc')
+GS_Log = dcv.GridSearchCV(pipeline,parameters,scheduler='threading',error_score=0.0,scoring='roc_auc')
 GS_Log.fit(X_train, y_train)
 GS_Log.score(X_test,y_test)
 y_pred = GS_Log.predict(X_test)
@@ -224,7 +208,7 @@ criterion = ['gini', 'entropy']
 max_depth = np.arange(5, 50, 2)
 parameters = {'forest__criterion':criterion,'forest__max_depth':max_depth, 'forest__random_state':[1]}
 #Fit and Evaluate
-GS_Forest = dcv.GridSearchCV(pipeline,parameters,scheduler='threading',cv=pds,scoring='roc_auc')
+GS_Forest = dcv.GridSearchCV(pipeline,parameters,scheduler='threading',scoring='roc_auc')
 GS_Forest.fit(X_train, y_train)
 y_pred = GS_Forest.predict(X_test)
 RandomForest_report =  classification_report(y_test, y_pred)
@@ -243,7 +227,7 @@ algorithm = ['ball_tree','kd_tree','brute']
 n_neighbors = np.arange(5, 50, 2)
 parameters = {'Knn__algorithm':algorithm,'Knn__weights':weights,'Knn__n_neighbors':n_neighbors}
 # Fit and Evaluate
-GS_Knn = dcv.GridSearchCV(pipeline,parameters,scheduler='threading',cv=pds,scoring='roc_auc')
+GS_Knn = dcv.GridSearchCV(pipeline,parameters,scheduler='threading',scoring='roc_auc')
 GS_Knn.fit(X_train, y_train)
 GS_Knn.score(X_test,y_test)
 y_pred = GS_Knn.predict(X_test)
@@ -265,7 +249,7 @@ alpha = [0.0001,0.001,0.01,0.1]
 learning_rate = ['constant','adaptive']
 parameters = {'MLP__hidden_layer_sizes':hidden_layer_sizes,'MLP__solver':solver,'MLP__alpha':alpha,'MLP__learning_rate':learning_rate,'MLP__random_state':[42],'MLP__max_iter':[10000]}
 # Fit and Evaluate
-GS_MLP = dcv.GridSearchCV(pipeline,parameters,scheduler='threading',cv=pds,scoring='roc_auc')
+GS_MLP = dcv.GridSearchCV(pipeline,parameters,scheduler='threading',scoring='roc_auc')
 GS_MLP.fit(X_train, y_train)
 GS_MLP.score(X_test, y_test)
 y_pred = GS_MLP.predict(X_test)
@@ -286,7 +270,7 @@ gamma = [1, 0.1, 0.01, 0.001, 0.0001]
 kernel = ['linear', 'poly']
 parameters = {'SVM__C':C, 'SVM__gamma':gamma, 'SVM__kernel':kernel, 'SVM__random_state':[42],'SVM__probability':[True]}
 # Fit and Evaluate
-GS_SVM = dcv.RandomizedSearchCV(pipeline,parameters,scheduler='threading',random_state=42, n_iter=20,cv=pds,scoring='roc_auc')
+GS_SVM = dcv.RandomizedSearchCV(pipeline,parameters,scheduler='threading',random_state=42, n_iter=20,scoring='roc_auc')
 GS_SVM.fit(X_train, y_train)
 GS_SVM.score(X_test, y_test)
 y_pred = GS_SVM.predict(X_test)
@@ -308,7 +292,6 @@ scores_df
 # Create ROC Plots
 plt.plot([0, 1], [0, 1], 'k--')
 plt.plot(fpr_log, tpr_log, label='Logistic Regression')
-plt.plot(fpr_NB, tpr_NB, label='Naive Bayes')
 plt.plot(fpr_forest, tpr_forest, label='Random Forest')
 plt.plot(fpr_Knn, tpr_Knn, label='KNN')
 plt.plot(fpr_MLP, tpr_MLP, label='MLP')
