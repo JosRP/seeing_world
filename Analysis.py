@@ -1,7 +1,5 @@
 import pandas as pd
 import numpy as np
-import seaborn as sns
-import matplotlib.pyplot as plt
 from sklearn import tree
 from sklearn.model_selection import cross_val_score, train_test_split, GridSearchCV,PredefinedSplit
 from sklearn.metrics import confusion_matrix, classification_report, precision_score, roc_auc_score, auc, roc_curve
@@ -18,6 +16,10 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.decomposition import PCA
 from sklearn import preprocessing
 import dask_ml.model_selection as dcv
+from keras.models import Sequential
+from keras.layers import Dense
+from keras.utils import to_categorical
+from keras import callbacks
 import yfinance as yf
 import pickle
 import itertools
@@ -101,7 +103,7 @@ df_Total["MA(150)_SPY"] = round(df_Total["Close_SPY"].rolling(150).mean(),2)
 df_Total["MA(200)_SPY"] = round(df_Total["Close_SPY"].rolling(200).mean(),2)
 
 # Create Label/Target variable
-df_Total = chrono_var(5,df_Total,"Close","Low","High",-0.02,0.10)
+df_Total = chrono_var(5,df_Total,"Close","Low","High",-0.05,0.10)
 
 # Relative Volume last 10 days
 df_Total["Rel. Vol(10)"] = round(df_Total["Volume"]/(df_Total["Volume"].rolling(10).mean())-1,2)
@@ -182,6 +184,41 @@ train_balanced = pd.concat([train_majority, minority_upsample])
 # Split train features and labels
 X_train =  train_balanced.drop(['Target(x)'],axis=1)
 y_train = train_balanced['Target(x)']
+
+
+########################## KERAS Neural Network
+# Keras labels & predictors preparation (w/ Scalling)
+n_cols=X_train.shape[1]
+one_hot_train = y_train.factorize()[0]
+one_hot_test = y_test.factorize()[0]
+scaler = preprocessing.StandardScaler().fit(X_train)
+X_train_scaled = scaler.transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+
+# Create Model
+model = Sequential()
+model.add(Dense(100, activation='relu', input_shape=(n_cols,)))
+model.add(Dense(100, activation='relu'))
+model.add(Dense(100, activation='relu'))
+model.add(Dense(100, activation='relu'))
+model.add(Dense(50, activation='relu'))
+model.add(Dense(1, activation='sigmoid'))
+model.compile(optimizer='adam',loss='binary_crossentropy',metrics='accuracy')
+# Set Stoping point
+earlystopping = callbacks.EarlyStopping(monitor ="val_loss",
+                                        mode ="min", patience = 5,
+                                        restore_best_weights = True)
+# Fit Model
+model.fit(X_train_scaled,one_hot_train,epochs=100,validation_data =(X_test_scaled, one_hot_test),callbacks =[earlystopping])
+
+
+
+predictions = pd.DataFrame(model.predict(X_test_scaled))
+y_true = pd.DataFrame(one_hot_test)
+df_result = pd.concat([y_true, predictions],axis=1,ignore_index=True)
+df_result.to_excel(r'C:/Users/jrpgo/Desktop/Full.xlsx')
+
+
 
 # Force Split in GridSearch
 split_index = [-1]*int(len(X_train)*0.7)+[0]*(len(X_train)-int(len(X_train)*0.7))
