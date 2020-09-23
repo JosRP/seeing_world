@@ -104,7 +104,7 @@ df_Total["MA(150)_SPY"] = round(df_Total["Close_SPY"].rolling(150).mean(),2)
 df_Total["MA(200)_SPY"] = round(df_Total["Close_SPY"].rolling(200).mean(),2)
 
 # Create Label/Target variable
-df_Total = chrono_var(5,df_Total,"Close","Low","High",-0.02,0.10)
+df_Total = chrono_var(5,df_Total,"Close","Low","High",-0.02,0.05)
 
 # Relative Volume last 10 days
 df_Total["Rel. Vol(10)"] = round(df_Total["Volume"]/(df_Total["Volume"].rolling(10).mean())-1,2)
@@ -199,25 +199,26 @@ X_test_scaled = scaler.transform(X_test)
 model = Sequential()
 model.add(Dense(100, activation='relu', input_shape=(n_cols,)))
 model.add(Dense(100, activation='relu'))
+model.add(Dense(50, activation='relu'))
+model.add(Dense(100, activation='relu'))
 model.add(Dense(100, activation='relu'))
 model.add(Dense(100, activation='relu'))
 model.add(Dense(50, activation='relu'))
 model.add(Dense(1, activation='sigmoid'))
 model.compile(optimizer='adam',loss='binary_crossentropy',metrics=['accuracy','Precision'])
 # Set Stoping point
-earlystopping = callbacks.EarlyStopping(monitor ='val_precision',
+earlystopping = callbacks.EarlyStopping(monitor ='val_accuracy',
                                         mode ="max", patience = 10,
                                         restore_best_weights = True)
 # Fit Model
 model.fit(X_train_scaled,one_hot_train,epochs=100,validation_data =(X_test_scaled, one_hot_test),callbacks =[earlystopping])
 
 
-
 predictions = pd.DataFrame(model.predict(X_test_scaled))
 y_true = pd.DataFrame(one_hot_test)
 X_true = pd.DataFrame(X_test_scaled)
 df_result = pd.concat([X_true,y_true, predictions],axis=1,ignore_index=True)
-df_result.to_excel(r'C:/Users/jrpgo/Desktop/Full.xlsx')
+df_result.to_excel(r'C:/Users/jrpgo/Desktop/Full2.xlsx')
 
 
 
