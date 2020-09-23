@@ -17,6 +17,7 @@ from sklearn.decomposition import PCA
 from sklearn import preprocessing
 import dask_ml.model_selection as dcv
 from keras.models import Sequential
+from keras.metrics import Precision
 from keras.layers import Dense
 from keras.utils import to_categorical
 from keras import callbacks
@@ -103,7 +104,7 @@ df_Total["MA(150)_SPY"] = round(df_Total["Close_SPY"].rolling(150).mean(),2)
 df_Total["MA(200)_SPY"] = round(df_Total["Close_SPY"].rolling(200).mean(),2)
 
 # Create Label/Target variable
-df_Total = chrono_var(5,df_Total,"Close","Low","High",-0.05,0.10)
+df_Total = chrono_var(5,df_Total,"Close","Low","High",-0.02,0.10)
 
 # Relative Volume last 10 days
 df_Total["Rel. Vol(10)"] = round(df_Total["Volume"]/(df_Total["Volume"].rolling(10).mean())-1,2)
@@ -158,9 +159,7 @@ df_Total['High Pos_SPY'] = round(df_Total['High_SPY']/df_Total['Close_SPY']-1,2)
 df_Total['Open Pos_SPY'] = round(df_Total['Open_SPY']/df_Total['Close_SPY']-1,2)
 
 # Apply time delay & Remove NaN & Clean columns
-data=df_Total.loc[:,['MA(5)', 'MA(10)',
-       'MA(50)', 'MA(100)', 'MA(150)', 'MA(200)', 'MA(5)_SPY', 'MA(10)_SPY',
-       'MA(50)_SPY', 'MA(100)_SPY', 'MA(150)_SPY', 'MA(200)_SPY', 'Target(x)',
+data=df_Total.loc[:,['Target(x)',
        'Rel. Vol(10)', 'Rel. Vol(10)_SPY', 'RSI', 'RSI_SPY', '5>10', '10>50',
        '50>100', '100>150', '150>200', '5>10_SPY', '10>50_SPY', '50>100_SPY',
        '100>150_SPY', '150>200_SPY', 'Low Pos', 'High Pos', 'Open Pos',
@@ -189,8 +188,9 @@ y_train = train_balanced['Target(x)']
 ########################## KERAS Neural Network
 # Keras labels & predictors preparation (w/ Scalling)
 n_cols=X_train.shape[1]
-one_hot_train = y_train.factorize()[0]
-one_hot_test = y_test.factorize()[0]
+one_hot_train = y_train.factorize()[0].astype(bool)
+type(one_hot_train[1])
+one_hot_test = y_test.factorize()[0].astype(bool)
 scaler = preprocessing.StandardScaler().fit(X_train)
 X_train_scaled = scaler.transform(X_train)
 X_test_scaled = scaler.transform(X_test)
@@ -203,10 +203,10 @@ model.add(Dense(100, activation='relu'))
 model.add(Dense(100, activation='relu'))
 model.add(Dense(50, activation='relu'))
 model.add(Dense(1, activation='sigmoid'))
-model.compile(optimizer='adam',loss='binary_crossentropy',metrics='accuracy')
+model.compile(optimizer='adam',loss='binary_crossentropy',metrics=['accuracy','Precision'])
 # Set Stoping point
-earlystopping = callbacks.EarlyStopping(monitor ="val_loss",
-                                        mode ="min", patience = 5,
+earlystopping = callbacks.EarlyStopping(monitor ='val_precision',
+                                        mode ="max", patience = 10,
                                         restore_best_weights = True)
 # Fit Model
 model.fit(X_train_scaled,one_hot_train,epochs=100,validation_data =(X_test_scaled, one_hot_test),callbacks =[earlystopping])
@@ -215,7 +215,8 @@ model.fit(X_train_scaled,one_hot_train,epochs=100,validation_data =(X_test_scale
 
 predictions = pd.DataFrame(model.predict(X_test_scaled))
 y_true = pd.DataFrame(one_hot_test)
-df_result = pd.concat([y_true, predictions],axis=1,ignore_index=True)
+X_true = pd.DataFrame(X_test_scaled)
+df_result = pd.concat([X_true,y_true, predictions],axis=1,ignore_index=True)
 df_result.to_excel(r'C:/Users/jrpgo/Desktop/Full.xlsx')
 
 
