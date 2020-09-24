@@ -55,10 +55,10 @@ def multi_shift(df,columns,shift):
         if shift<1:
             y=-1
         for t in range(1,(shift+y)):
-            df.loc[:,str(i)+"_("+str(t) +")"]=df[str(i)].shift(t)
+            df.loc[:,str(i)+"("+str(t) +")"]=df[str(i)].shift(t)
     return df
 
-first_day = "2010-01-01"
+first_day = "2000-01-01"
 last_day = "2020-09-10"
 
 SPY = yf.download("SPY", start=first_day, end=last_day,actions=False)
@@ -104,7 +104,7 @@ df_Total["MA(150)_SPY"] = round(df_Total["Close_SPY"].rolling(150).mean(),2)
 df_Total["MA(200)_SPY"] = round(df_Total["Close_SPY"].rolling(200).mean(),2)
 
 # Create Label/Target variable
-df_Total = chrono_var(5,df_Total,"Close","Low","High",-0.02,0.05)
+df_Total = chrono_var(10,df_Total,"Close","Low","High",-0.02,0.10)
 
 # Relative Volume last 10 days
 df_Total["Rel. Vol(10)"] = round(df_Total["Volume"]/(df_Total["Volume"].rolling(10).mean())-1,2)
@@ -158,15 +158,34 @@ df_Total['Low Pos_SPY'] = round(df_Total['Low_SPY']/df_Total['Close_SPY']-1,2)
 df_Total['High Pos_SPY'] = round(df_Total['High_SPY']/df_Total['Close_SPY']-1,2)
 df_Total['Open Pos_SPY'] = round(df_Total['Open_SPY']/df_Total['Close_SPY']-1,2)
 
+# MA's Relationship to Close
+df_Total['MA(5) Pos'] = round(df_Total['MA(5)']/df_Total['Close']-1,2)
+df_Total['MA(10) Pos'] = round(df_Total['MA(10)']/df_Total['Close']-1,2)
+df_Total['MA(50) Pos'] = round(df_Total['MA(50)']/df_Total['Close']-1,2)
+df_Total['MA(100) Pos'] = round(df_Total['MA(100)']/df_Total['Close']-1,2)
+df_Total['MA(150) Pos'] = round(df_Total['MA(150)']/df_Total['Close']-1,2)
+df_Total['MA(200) Pos'] = round(df_Total['MA(200)']/df_Total['Close']-1,2)
+
+df_Total['MA(5) Pos_SPY'] = round(df_Total['MA(5)_SPY']/df_Total['Close_SPY']-1,2)
+df_Total['MA(10) Pos_SPY'] = round(df_Total['MA(10)_SPY']/df_Total['Close_SPY']-1,2)
+df_Total['MA(50) Pos_SPY'] = round(df_Total['MA(50)_SPY']/df_Total['Close_SPY']-1,2)
+df_Total['MA(100) Pos_SPY'] = round(df_Total['MA(100)_SPY']/df_Total['Close_SPY']-1,2)
+df_Total['MA(150) Pos_SPY'] = round(df_Total['MA(150)_SPY']/df_Total['Close_SPY']-1,2)
+df_Total['MA(200) Pos_SPY'] = round(df_Total['MA(200)_SPY']/df_Total['Close_SPY']-1,2)
+
 # Apply time delay & Remove NaN & Clean columns
 data=df_Total.loc[:,['Target(x)',
        'Rel. Vol(10)', 'Rel. Vol(10)_SPY', 'RSI', 'RSI_SPY', '5>10', '10>50',
        '50>100', '100>150', '150>200', '5>10_SPY', '10>50_SPY', '50>100_SPY',
        '100>150_SPY', '150>200_SPY', 'Low Pos', 'High Pos', 'Open Pos',
-       'Low Pos_SPY', 'High Pos_SPY', 'Open Pos_SPY']]
-data = multi_shift(data,data.columns[data.columns!="Target(x)"],5)
-data = data.dropna()
+       'Low Pos_SPY', 'High Pos_SPY', 'Open Pos_SPY', 'MA(5) Pos',
+       'MA(10) Pos', 'MA(50) Pos', 'MA(100) Pos', 'MA(150) Pos', 'MA(200) Pos',
+       'MA(5) Pos_SPY', 'MA(10) Pos_SPY', 'MA(50) Pos_SPY', 'MA(100) Pos_SPY',
+       'MA(150) Pos_SPY', 'MA(200) Pos_SPY']]
 
+data = multi_shift(data,data.columns[data.columns!='Target(x)'],5)
+data_check=pd.DataFrame(data.isna().sum())
+data = data.dropna()
 ## Split Train Test ORDERED
 train, test= np.split(data, [int(.70 *len(data))])
 # Split test features and labels
@@ -189,21 +208,17 @@ y_train = train_balanced['Target(x)']
 # Keras labels & predictors preparation (w/ Scalling)
 n_cols=X_train.shape[1]
 one_hot_train = y_train.factorize()[0].astype(bool)
-type(one_hot_train[1])
 one_hot_test = y_test.factorize()[0].astype(bool)
 scaler = preprocessing.StandardScaler().fit(X_train)
+X_train
 X_train_scaled = scaler.transform(X_train)
 X_test_scaled = scaler.transform(X_test)
 
 # Create Model
 model = Sequential()
 model.add(Dense(100, activation='relu', input_shape=(n_cols,)))
-model.add(Dense(100, activation='relu'))
-model.add(Dense(50, activation='relu'))
-model.add(Dense(100, activation='relu'))
-model.add(Dense(100, activation='relu'))
-model.add(Dense(100, activation='relu'))
-model.add(Dense(50, activation='relu'))
+model.add(Dense(10, activation='relu'))
+model.add(Dense(5, activation='relu'))
 model.add(Dense(1, activation='sigmoid'))
 model.compile(optimizer='adam',loss='binary_crossentropy',metrics=['accuracy','Precision'])
 # Set Stoping point
